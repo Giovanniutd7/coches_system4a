@@ -307,12 +307,13 @@
 #     ventana = Tk()
 #     app = App(ventana)
 #     ventana.mainloop()
-from coches import cochesBD, coches
+from coches import coches
 from tkinter import *
 from tkinter import messagebox
+from mysql.connector import Error
 
 class App:
-    def _init_(self, ventana):
+    def __init__(self, ventana):
         self.ventana = ventana
         self.ventana.title("Gestion de coches")
         self.ventana.geometry("600x600")
@@ -373,6 +374,12 @@ class App:
         self.id.focus()
         self.id.pack(pady=5)
 
+        self.btn_buscar = Button(
+            self.ventana,
+            text="Buscar",
+            command=self.buscar_controller,
+        )
+        self.btn_buscar.pack(pady=5)
         Button(self.ventana, text= "Eliminar", command=self.eliminar_controller).pack(pady=5)
         Button(self.ventana, text="Regresar", command=self.menu_acciones).pack(pady=5)
 
@@ -415,8 +422,11 @@ class App:
     def consultar_view(self):
         self.borrarPantalla()
         Label(self.ventana, text="...::Consultar los coches::...").pack(pady=10)
-        filas=""
-        filas=self.consultar_controller(filas)
+        try:
+            filas = self.consultar_controller("")
+        except Error as error:
+            messagebox.showerror("Error", f"No se pudieron consultar los coches: {error}")
+            filas = ""
         Label(self.ventana, text=f"{'Coche #':<15}{'ID':<15}{'marca':<15}{'color':<15}{'modelo':<15}{'velocidad':<15}{'potencia':<15}{'asientos':<15}").pack(pady=10)
         Label(self.ventana, text=f"{filas}").pack(pady=10)
         Button(self.ventana, text="Regresar", command=self.menu_acciones).pack(pady=5)
@@ -430,29 +440,74 @@ class App:
                 messagebox.showerror(title="... ¡ Verifica por favor ! ...", message="❌ ¡Opcion invalida! Oprima cualquier tecla para continuar... ❌")
     
     def insertar_controller(self):
-        coche1 = coches.Coches(self.marca.get(), self.color.get(), self.modelo.get(), self.velocidad.get(), self.potencia.get(), self.asientos.get())                    
-        coche1 = cochesBD.cochesBD(self.marca.get(), self.color.get(), self.modelo.get(), self.velocidad.get(), self.potencia.get(), self.asientos.get())
-        respuesta = coche1.insertar()
-        self.respuesta_sql(respuesta)
-        del coche1
-        self.insertar_view()
+        try:
+            coche = coches.Coches(
+                self.marca.get().strip(),
+                self.color.get().strip(),
+                self.modelo.get().strip(),
+                int(self.velocidad.get().strip()),
+                int(self.potencia.get().strip()),
+                int(self.asientos.get().strip()),
+            )
+            respuesta = coche.insertar()
+            self.respuesta_sql(respuesta)
+            self.insertar_view()
+        except ValueError:
+            messagebox.showerror("Error", "Velocidad, potencia y asientos deben ser números enteros.")
+        except Error as error:
+            messagebox.showerror("Error", f"No se pudo guardar el coche: {error}")
 
     def eliminar_controller(self):
-        id=self.id.get()
-        respuesta = cochesBD.cochesBD.eliminar(id)
-        self.respuesta_sql(respuesta)
-        self.eliminar_view()
+        try:
+            id_coche = int(self.id.get().strip())
+            respuesta = coches.Coches.eliminar(id_coche)
+            self.respuesta_sql(respuesta)
+            self.eliminar_view()
+        except ValueError:
+            messagebox.showerror("Error", "El ID debe ser un número entero.")
+        except Error as error:
+            messagebox.showerror("Error", f"No se pudo eliminar el coche: {error}")
+
+    def buscar_controller(self):
+        try:
+            id_coche = int(self.id.get().strip())
+            coche = coches.Coches.consultar_por_id(id_coche)
+            if coche is None:
+                messagebox.showinfo("Búsqueda", "No se encontró un coche con ese ID.")
+                return
+
+            messagebox.showinfo(
+                "Coche encontrado",
+                f"ID: {coche[0]}\nMarca: {coche[1]}\nColor: {coche[2]}\n"
+                f"Modelo: {coche[3]}\nVelocidad: {coche[4]}\n"
+                f"Potencia: {coche[5]}\nAsientos: {coche[6]}",
+            )
+        except ValueError:
+            messagebox.showerror("Error", "El ID debe ser un número entero.")
+        except Error as error:
+            messagebox.showerror("Error", f"No se pudo buscar el coche: {error}")
 
     def modificar_controller(self):
-        id=self.id.get()                     
-        coche1 = cochesBD.cochesBD(self.marca.get(), self.color.get(), self.modelo.get(), self.velocidad.get(), self.potencia.get(), self.asientos.get())
-        respuesta = coche1.actualizar(id)
-        self.respuesta_sql(respuesta)
-        del coche1
-        self.modificar_view()
+        try:
+            id_coche = int(self.id.get().strip())
+            coche = coches.Coches(
+                self.marca.get().strip(),
+                self.color.get().strip(),
+                self.modelo.get().strip(),
+                int(self.velocidad.get().strip()),
+                int(self.potencia.get().strip()),
+                int(self.asientos.get().strip()),
+            )
+            respuesta = coche.actualizar(id_coche)
+            self.respuesta_sql(respuesta)
+            self.modificar_view()
+        except ValueError:
+            messagebox.showerror("Error", "El ID, velocidad, potencia y asientos deben ser números enteros.")
+        except Error as error:
+            messagebox.showerror("Error", f"No se pudo actualizar el coche: {error}")
 
     def consultar_controller(self, filas):
-        registros=cochesBD.cochesBD.consultar()
+        registros = coches.Coches.consultar()
         if len(registros) > 0:
             numero_coches=1
             for fila in registros:
@@ -465,7 +520,7 @@ class App:
 
 
 
-if _name_=="_main_":
+if __name__ == "__main__":
     ventana = Tk()
     app = App(ventana)
     ventana.mainloop()
